@@ -113,7 +113,7 @@ const ChatBlock: React.FC<Props> = ({block, loading, isLastBlock}) => {
                       : (isUser ? (
                           <div ref={contentRef} className="self-end">
                             <div
-                                className="inline-block max-w-[85%] md:max-w-[70%] rounded-3xl px-4 py-2 shadow-sm text-left bg-emerald-500 text-white">
+                                className="inline-block md:max-w-[70%] rounded-3xl px-4 py-2 shadow-sm text-left bg-emerald-500 text-white">
                               <UserContentBlock text={block.content}
                                                 fileDataRef={(block.fileDataRef) ? block.fileDataRef : []}/>
                             </div>
