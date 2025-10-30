@@ -267,11 +267,21 @@ const MainPage: React.FC<MainPageProps> = ({className, isSidebarCollapsed, toggl
   };
 
   const callApp = (message: string, fileDataRef: FileDataRef[]) => {
+    const messageIncludesAiMention = message.toLowerCase().includes('@ai');
     if (!conversation) {
       startConversation(message, fileDataRef);
     }
     setAllowAutoScroll(true);
-    addMessage(Role.User, MessageType.Normal, message, fileDataRef, sendMessage);
+    addMessage(
+      Role.User,
+      MessageType.Normal,
+      message,
+      fileDataRef,
+      messageIncludesAiMention ? sendMessage : undefined
+    );
+    if (!messageIncludesAiMention) {
+      setLoading(false);
+    }
   };
 
   const addMessage = (
