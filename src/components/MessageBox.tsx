@@ -2,11 +2,13 @@
 import React, {
   ChangeEvent,
   FormEvent,
+  UIEvent,
   forwardRef,
   KeyboardEvent,
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState
 } from 'react';
@@ -55,6 +57,7 @@ const MessageBox =
       const selectionRef = useRef<{ start: number; end: number }>({start: 0, end: 0});
       const [fileDataRef, setFileDataRef] = useState<FileDataRef[]>([]);
       const [isExpanded, setIsExpanded] = useState(false);
+      const [expandedScrollOffset, setExpandedScrollOffset] = useState(0);
       const [draftText, setDraftText] = useState('');
       const attachmentsLabel = t('attachments', {defaultValue: 'Attachments'});
       const editorLabel = t('editor', {defaultValue: 'Editor'});
@@ -422,6 +425,7 @@ const MessageBox =
             end: textAreaRef.current.selectionEnd || 0,
           };
         }
+        setExpandedScrollOffset(0);
         setIsExpanded(true);
       };
 
@@ -432,6 +436,7 @@ const MessageBox =
             end: textAreaRef.current.selectionEnd || 0,
           };
         }
+        setExpandedScrollOffset(0);
         setIsExpanded(false);
         focusComposer();
       };
@@ -541,20 +546,55 @@ const MessageBox =
         ></textarea>
       );
 
-      const expandedTextarea = (
-        <textarea
-          id="sendMessageInput"
-          name="message"
-          ref={textAreaRef}
-          tabIndex={0}
-          className="h-full w-full flex-1 resize-none border-0 bg-transparent px-3 py-3 focus:ring-0 focus-visible:ring-0 outline-hidden shadow-none dark:bg-transparent"
-          placeholder={t('send-a-message')}
-          onKeyDown={checkForSpecialKey}
-          onChange={handleTextChange}
-          onPaste={handlePaste}
-          style={{minHeight: 0}}
-          value={draftText}
-        ></textarea>
+      const lineCount = useMemo(() => {
+        if (!draftText) {
+          return 1;
+        }
+        return draftText.split(/\r\n|\r|\n/).length;
+      }, [draftText]);
+
+      const lineNumberColumnWidth = useMemo(() => {
+        const digits = Math.max(String(lineCount).length, 2);
+        return `calc(${digits}ch + 1.5rem)`;
+      }, [lineCount]);
+
+      const handleExpandedScroll = useCallback((event: UIEvent<HTMLTextAreaElement>) => {
+        setExpandedScrollOffset(event.currentTarget.scrollTop);
+      }, []);
+
+      const expandedEditor = (
+        <div className="flex h-full w-full">
+          <div
+            aria-hidden="true"
+            className="relative flex-none border-r border-black/10 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/40"
+            style={{width: lineNumberColumnWidth}}
+          >
+            <div
+              className="pointer-events-none select-none px-3 py-3 text-right text-xs font-mono leading-6 text-gray-400 dark:text-gray-500"
+              style={{transform: `translateY(-${expandedScrollOffset}px)`}}
+            >
+              {Array.from({length: lineCount}, (_, index) => (
+                <div key={index} className="tabular-nums">
+                  {index + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+          <textarea
+            id="sendMessageInput"
+            name="message"
+            ref={textAreaRef}
+            tabIndex={0}
+            className="h-full w-full flex-1 resize-none border-0 bg-transparent px-3 py-3 font-sans text-base leading-6 focus:ring-0 focus-visible:ring-0 outline-hidden shadow-none dark:bg-transparent"
+            placeholder={t('send-a-message')}
+            onKeyDown={checkForSpecialKey}
+            onChange={handleTextChange}
+            onPaste={handlePaste}
+            onScroll={handleExpandedScroll}
+            style={{minHeight: 0}}
+            value={draftText}
+          ></textarea>
+        </div>
       );
 
       const previewPane = (
@@ -594,7 +634,7 @@ const MessageBox =
                     <span className="text-xs text-gray-500 dark:text-gray-400">{editorLabel}</span>
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    {expandedTextarea}
+                    {expandedEditor}
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col overflow-hidden">
