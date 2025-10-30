@@ -33,6 +33,10 @@
   margin-top: 0.35em;
 }
 
+body.expanded-editor-open .conversation-list-container {
+  display: none;
+}
+
 /* Styles for the MainPage container */
 
 .main-content {

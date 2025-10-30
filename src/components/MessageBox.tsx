@@ -442,9 +442,14 @@ const MessageBox =
       };
 
       useEffect(() => {
+        if (typeof document === 'undefined') {
+          return;
+        }
+
         if (isExpanded) {
           const previousOverflow = document.body.style.overflow;
           document.body.style.overflow = 'hidden';
+          document.body.classList.add('expanded-editor-open');
           setTimeout(() => {
             textAreaRef.current?.focus();
             if (textAreaRef.current) {
@@ -454,8 +459,10 @@ const MessageBox =
           }, 0);
           return () => {
             document.body.style.overflow = previousOverflow;
+            document.body.classList.remove('expanded-editor-open');
           };
         } else {
+          document.body.classList.remove('expanded-editor-open');
           if (textAreaRef.current) {
             textAreaRef.current.style.height = 'auto';
             textAreaRef.current.selectionStart = selectionRef.current.start;
