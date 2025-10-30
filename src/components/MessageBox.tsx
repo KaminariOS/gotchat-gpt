@@ -5,6 +5,7 @@ import React, {
   forwardRef,
   KeyboardEvent,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState
@@ -19,11 +20,12 @@ import {
 import {SubmitButton} from "./SubmitButton";
 import {useTranslation} from 'react-i18next';
 import {ChatService} from "../service/ChatService";
-import {PaperClipIcon, StopCircleIcon} from "@heroicons/react/24/outline";
+import {PaperClipIcon, StopCircleIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon} from "@heroicons/react/24/outline";
 import Tooltip from "./Tooltip";
 import FileDataPreview from './FileDataPreview';
 import {FileDataRef} from '../models/FileData';
 import {preprocessImage} from '../utils/ImageUtils';
+import MarkdownBlock from './MarkdownBlock';
 
 interface MessageBoxProps {
   callApp: Function;
@@ -50,17 +52,38 @@ const MessageBox =
       const [isTextEmpty, setIsTextEmpty] = useState(true);
       const textAreaRef = useRef<HTMLTextAreaElement>(null);
       const resizeTimeoutRef = useRef<number | null>(null);
+      const selectionRef = useRef<{ start: number; end: number }>({start: 0, end: 0});
       const [fileDataRef, setFileDataRef] = useState<FileDataRef[]>([]);
+      const [isExpanded, setIsExpanded] = useState(false);
+      const [draftText, setDraftText] = useState('');
+      const attachmentsLabel = t('attachments', {defaultValue: 'Attachments'});
+      const editorLabel = t('editor', {defaultValue: 'Editor'});
+      const previewLabel = t('preview', {defaultValue: 'Preview'});
+      const expandLabel = t('expand', {defaultValue: 'Expand'});
+      const collapseLabel = t('collapse', {defaultValue: 'Collapse'});
+
+      const focusComposer = useCallback(() => {
+        setTimeout(() => {
+          if (textAreaRef.current) {
+            textAreaRef.current.focus();
+            textAreaRef.current.selectionStart = selectionRef.current.start;
+            textAreaRef.current.selectionEnd = selectionRef.current.end;
+          }
+        }, 0);
+      }, []);
 
       const setTextValue = (value: string) => {
         textValue.current = value;
       }
 
       const setTextAreaValue = (value: string) => {
+        setDraftText(value);
+        setTextValue(value);
+        setIsTextEmpty(value.trim() === '');
         if (textAreaRef.current) {
           textAreaRef.current.value = value;
         }
-        setIsTextEmpty(textAreaRef.current?.value.trim() === '');
+        selectionRef.current = {start: value.length, end: value.length};
         debouncedResize();
       }
 
@@ -84,9 +107,7 @@ const MessageBox =
           }
         },
         focusTextarea: () => {
-          if (textAreaRef.current) {
-            textAreaRef.current.focus();
-          }
+          focusComposer();
         },
         pasteText: (text: string) => {
           insertTextAtCursorPosition(text);
@@ -97,6 +118,10 @@ const MessageBox =
       const handleAutoResize = useCallback(() => {
         if (textAreaRef.current) {
           const target = textAreaRef.current;
+          if (isExpanded) {
+            target.style.height = '100%';
+            return;
+          }
           const maxHeight = parseInt(getComputedStyle(target).lineHeight || '0', 10) * MAX_ROWS;
 
           target.style.height = 'auto';
@@ -106,7 +131,7 @@ const MessageBox =
             target.style.height = `${maxHeight}px`;
           }
         }
-      }, []);
+      }, [isExpanded]);
 
       // Debounced resize function
       const debouncedResize = useCallback(() => {
@@ -115,8 +140,8 @@ const MessageBox =
         }
         resizeTimeoutRef.current = window.setTimeout(() => {
           handleAutoResize();
-        }, 100); // Adjust the debounce time as needed
-      }, []);
+        }, 100);
+      }, [handleAutoResize]);
 
       const handleTextValueUpdated = () => {
         debouncedResize();
@@ -136,6 +161,8 @@ const MessageBox =
         setFileDataRef([]);
         setTextValue('');
         setTextAreaValue('');
+        setDraftText('');
+        selectionRef.current = {start: 0, end: 0};
       }
 
       const insertTextAtCursorPosition = (textToInsert: string) => {
@@ -152,6 +179,7 @@ const MessageBox =
           // Update the state with the new value
           setTextValue(newTextValue);
           setTextAreaValue(newTextValue);
+          selectionRef.current = {start: startPos + textToInsert.length, end: startPos + textToInsert.length};
 
           // Dispatch a new InputEvent for the insertion of text
           // This event should be undoable
@@ -253,10 +281,19 @@ const MessageBox =
           } else {
             if (!loading) {
               e.preventDefault();
-              if (textAreaRef.current) {
-                setTextValue(textAreaRef.current.value);
+              if (e.currentTarget) {
+                selectionRef.current = {
+                  start: e.currentTarget.selectionStart || 0,
+                  end: e.currentTarget.selectionEnd || 0,
+                };
               }
-              callApp(textAreaRef.current?.value || '', (allowImageAttachment === 'yes') ? fileDataRef : []);
+              const messageText = draftText;
+              setTextValue(messageText);
+              callApp(messageText, (allowImageAttachment === 'yes') ? fileDataRef : []);
+              setTextAreaValue('');
+              setIsExpanded(false);
+              selectionRef.current = {start: 0, end: 0};
+              focusComposer();
             }
           }
         }
@@ -264,20 +301,23 @@ const MessageBox =
 
       const handleTextChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
         const newValue = event.target.value;
-        setIsTextEmpty(textAreaRef.current?.value.trim() === '');
+        selectionRef.current = {start: event.target.selectionStart || 0, end: event.target.selectionEnd || 0};
+        setIsTextEmpty(newValue.trim() === '');
+        setDraftText(newValue);
+        setTextValue(newValue);
         handleTextValueUpdated();
       };
 
       const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        if (textAreaRef.current) {
-          setTextValue(textAreaRef.current.value);
-        }
-        callApp(textAreaRef.current?.value || '', (allowImageAttachment === 'yes') ? fileDataRef : []);
-        if (textAreaRef.current) {
-          textAreaRef.current.style.height = 'auto';
-        }
+        const messageText = draftText;
+        setTextValue(messageText);
+        callApp(messageText, (allowImageAttachment === 'yes') ? fileDataRef : []);
+        setTextAreaValue('');
+        setIsExpanded(false);
+        selectionRef.current = {start: 0, end: 0};
+        focusComposer();
       };
       const handleCancel = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
@@ -333,6 +373,12 @@ const MessageBox =
                   const textContent = reader.result as string;
                   const formattedText = `File: ${file.name}:\n${SNIPPET_MARKERS.begin}\n${textContent}\n${SNIPPET_MARKERS.end}\n`;
                   insertTextAtCursorPosition(formattedText);
+                  if (textAreaRef.current) {
+                    selectionRef.current = {
+                      start: textAreaRef.current.selectionStart || 0,
+                      end: textAreaRef.current.selectionEnd || 0,
+                    };
+                  }
 
                   // Focus the textarea and place the cursor at the end of the text
                   if (textAreaRef.current) {
@@ -367,6 +413,180 @@ const MessageBox =
         setFileDataRef(fileDataRef.filter((_, i) => i !== index));
       };
 
+      const handleExpandEditor = () => {
+        if (textAreaRef.current) {
+          selectionRef.current = {
+            start: textAreaRef.current.selectionStart || 0,
+            end: textAreaRef.current.selectionEnd || 0,
+          };
+        }
+        setIsExpanded(true);
+      };
+
+      const handleCollapseEditor = () => {
+        if (textAreaRef.current) {
+          selectionRef.current = {
+            start: textAreaRef.current.selectionStart || 0,
+            end: textAreaRef.current.selectionEnd || 0,
+          };
+        }
+        setIsExpanded(false);
+        focusComposer();
+      };
+
+      useEffect(() => {
+        if (isExpanded) {
+          const previousOverflow = document.body.style.overflow;
+          document.body.style.overflow = 'hidden';
+          setTimeout(() => {
+            textAreaRef.current?.focus();
+            if (textAreaRef.current) {
+              textAreaRef.current.selectionStart = selectionRef.current.start;
+              textAreaRef.current.selectionEnd = selectionRef.current.end;
+            }
+          }, 0);
+          return () => {
+            document.body.style.overflow = previousOverflow;
+          };
+        } else {
+          if (textAreaRef.current) {
+            textAreaRef.current.style.height = 'auto';
+            textAreaRef.current.selectionStart = selectionRef.current.start;
+            textAreaRef.current.selectionEnd = selectionRef.current.end;
+          }
+          focusComposer();
+        }
+      }, [focusComposer, isExpanded]);
+
+      const renderAttachmentButton = () => (
+        <button
+          type="button"
+          onClick={(e) => handleAttachment(e)}
+          className="p-1 relative z-10 flex items-center gap-1 text-sm hover:text-emerald-600"
+        >
+          <PaperClipIcon className="h-6 w-6"/>
+          <span className="hidden sm:inline">{attachmentsLabel}</span>
+        </button>
+      );
+
+      const renderStopOrSubmit = (buttonClass?: string) => (
+        <div className={`flex items-center justify-end ${buttonClass ?? ''}`}>
+          {loading ? (
+            <Tooltip title={t('cancel-output')} side="top" sideOffset={0}>
+              <button
+                type="button"
+                onClick={(e) => handleCancel(e)}
+                className="p-1">
+                <StopCircleIcon className="h-6 w-6"/>
+              </button>
+            </Tooltip>
+          ) : (
+            <SubmitButton
+              disabled={isTextEmpty || loading}
+              loading={loading}
+            />
+          )}
+        </div>
+      );
+
+      const renderFilePreview = (className?: string) => (
+        fileDataRef.length > 0 && (
+          <div className={className ?? 'w-full'}>
+            <FileDataPreview fileDataRef={fileDataRef} removeFileData={handleRemoveFileData}
+                             allowImageAttachment={allowImageAttachment == 'yes'}/>
+          </div>
+        )
+      );
+
+      const collapsedTextarea = (
+        <textarea
+          id="sendMessageInput"
+          name="message"
+          tabIndex={0}
+          ref={textAreaRef}
+          rows={1}
+          className="flex-auto m-0 resize-none border-0 bg-transparent px-2 py-2 focus:ring-0 focus-visible:ring-0 outline-hidden shadow-none dark:bg-transparent"
+          placeholder={t('send-a-message')}
+          onKeyDown={checkForSpecialKey}
+          onChange={handleTextChange}
+          onPaste={handlePaste}
+          style={{ minWidth: 0 }}
+          value={draftText}
+        ></textarea>
+      );
+
+      const expandedTextarea = (
+        <textarea
+          id="sendMessageInput"
+          name="message"
+          ref={textAreaRef}
+          tabIndex={0}
+          className="h-full w-full flex-1 resize-none border-0 bg-transparent px-3 py-3 focus:ring-0 focus-visible:ring-0 outline-hidden shadow-none dark:bg-transparent"
+          placeholder={t('send-a-message')}
+          onKeyDown={checkForSpecialKey}
+          onChange={handleTextChange}
+          onPaste={handlePaste}
+          style={{minHeight: 0}}
+          value={draftText}
+        ></textarea>
+      );
+
+      const previewPane = (
+        <div className="flex-1 overflow-auto p-4 bg-gray-50 dark:bg-gray-900/40">
+          <div className="markdown prose max-w-none break-words dark:prose-invert light">
+            <MarkdownBlock markdown={draftText} role="user" loading={false}/>
+          </div>
+        </div>
+      );
+
+      if (isExpanded) {
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col bg-black/50">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 bg-white dark:bg-gray-900">
+              <div className="flex items-center justify-between border-b border-black/10 dark:border-gray-800 px-4 py-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('send-a-message')}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCollapseEditor}
+                    className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-3 py-1 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    <ArrowsPointingInIcon className="h-4 w-4"/>
+                    {collapseLabel}
+                  </button>
+                </div>
+              </div>
+              {renderFilePreview('border-b border-black/10 dark:border-gray-800')}
+              <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+                <div className="flex flex-1 flex-col overflow-hidden md:border-r md:border-black/10 md:dark:border-gray-800">
+                  <div className="flex items-center justify-between border-b border-black/10 dark:border-gray-800 px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      {renderAttachmentButton()}
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{editorLabel}</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    {expandedTextarea}
+                  </div>
+                </div>
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-black/10 dark:border-gray-800 px-4 py-2">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{previewLabel}</span>
+                  </div>
+                  {previewPane}
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-black/10 dark:border-gray-800 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  {renderAttachmentButton()}
+                </div>
+                {renderStopOrSubmit()}
+              </div>
+            </form>
+          </div>
+        );
+      }
+
       return (
         <div
           style={{position: "sticky"}}
@@ -390,10 +610,16 @@ const MessageBox =
               <div className="flex items-center w-full relative space-x-2">
                 {/* Attachment Button */}
                 <div className="flex items-center justify-start">
+                  {renderAttachmentButton()}
+                </div>
+                <div className="flex items-center">
                   <button
-                    onClick={(e) => handleAttachment(e)}
-                    className="p-1 relative z-10">
-                    <PaperClipIcon className="h-6 w-6"/>
+                    type="button"
+                    onClick={handleExpandEditor}
+                    className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-2 py-1 text-xs text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    <ArrowsPointingOutIcon className="h-4 w-4"/>
+                    {expandLabel}
                   </button>
                 </div>
 
@@ -403,37 +629,10 @@ const MessageBox =
                 </div>
 
                 {/* Textarea */}
-                <textarea
-                  id="sendMessageInput"
-                  name="message"
-                  tabIndex={0}
-                  ref={textAreaRef}
-                  rows={1}
-                  className="flex-auto m-0 resize-none border-0 bg-transparent px-2 py-2 focus:ring-0 focus-visible:ring-0 outline-hidden shadow-none dark:bg-transparent"
-                  placeholder={t('send-a-message')}
-                  onKeyDown={checkForSpecialKey}
-                  onChange={handleTextChange}
-                  onPaste={handlePaste}
-                  style={{ minWidth: 0 }}
-                ></textarea>
+                {collapsedTextarea}
 
                 {/* Cancel/Submit Button */}
-                <div className="flex items-center justify-end">
-                  {loading ? (
-                    <Tooltip title={t('cancel-output')} side="top" sideOffset={0}>
-                      <button
-                        onClick={(e) => handleCancel(e)}
-                        className="p-1">
-                        <StopCircleIcon className="h-6 w-6"/>
-                      </button>
-                    </Tooltip>
-                  ) : (
-                    <SubmitButton
-                      disabled={isTextEmpty || loading}
-                      loading={loading}
-                    />
-                  )}
-                </div>
+                {renderStopOrSubmit()}
               </div>
             </div>
           </form>
