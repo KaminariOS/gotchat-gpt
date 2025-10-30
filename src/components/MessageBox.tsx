@@ -626,7 +626,6 @@ const MessageBox =
                       className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-3 py-1 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       <ArrowsPointingInIcon className="h-4 w-4"/>
-                      {collapseLabel}
                     </button>
                   </Tooltip>
                 </div>
@@ -695,7 +694,6 @@ const MessageBox =
                       className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-2 py-1 text-xs text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       <ArrowsPointingOutIcon className="h-4 w-4"/>
-                      {expandLabel}
                     </button>
                   </Tooltip>
                 </div>
