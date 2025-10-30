@@ -20,6 +20,8 @@ const ChatBlock: React.FC<Props> = ({block, loading, isLastBlock}) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [savedHeight, setSavedHeight] = useState<string | null>(null);
   const { userSettings } = useContext(UserContext);
+  const isUser = block.role === 'user';
+  const isAssistant = block.role === 'assistant';
 
   const errorStyles = block.messageType === MessageType.Error ? {
     backgroundColor: userSettings.theme === 'dark' ? 'rgb(50, 36, 36)' : '#F5E6E6',
@@ -77,24 +79,25 @@ const ChatBlock: React.FC<Props> = ({block, loading, isLastBlock}) => {
   return (
       <div key={`chat-block-${block.id}`}
            className={`group w-full text-gray-800 dark:text-gray-100 border-b border-black/10 dark:border-gray-900/50
-            ${block.role === 'assistant' ? 'bg-custom-gray dark:bg-gray-900' : 'bg-white dark:bg-gray-850'}`}>
+            ${isAssistant ? 'bg-custom-gray dark:bg-gray-900' : 'bg-white dark:bg-gray-850'}`}>
         <div
             className="text-base md:max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl 3xl:max-w-6xl 4xl:max-w7xl p-2 flex lg:px-0 m-auto flex-col">
-          <div className="w-full flex">
-            <div className="w-[30px] flex flex-col relative items-end mr-4">
-              <div className="relative flex h-[30px] w-[30px] p-0 rounded-xs items-center justify-center">
-                {block.role === 'user' ? (
-                    <UserCircleIcon width={24} height={24}/>
-                ) : block.role === 'assistant' ? (
+          <div className={`w-full flex ${isUser ? 'flex-row-reverse' : ''}`}>
+            <div className={`w-[30px] flex flex-col relative ${isUser ? 'items-start ml-4' : 'items-end mr-4'}`}>
+              <div className={`relative flex h-[30px] w-[30px] p-0 rounded-full items-center justify-center
+               ${isUser ? 'bg-emerald-500 text-white shadow-sm' : ''}`}>
+                {isUser ? (
+                    <UserCircleIcon width={20} height={20}/>
+                ) : isAssistant ? (
                     <SparklesIcon key={`open-ai-logo-${block.id}`}/>
                 ) : null}
               </div>
             </div>
-            <div className="relative flex w-[calc(100%-50px)] flex-col gap-1 md:gap-3 lg:w-full">
+            <div className={`relative flex w-[calc(100%-50px)] flex-col gap-1 md:gap-3 lg:w-full ${isUser ? 'items-end text-right' : ''}`}>
               <div id={`message-block-${block.id}`} className="flex grow flex-col gap-3"
                    style={errorStyles}>
                 <div
-                    className="min-h-[20px] flex flex-col items-start gap-4">
+                    className={`min-h-[20px] flex flex-col gap-4 ${isUser ? 'items-end' : 'items-start'}`}>
                   {isEdit ? (
                           <textarea
                               spellCheck={false}
@@ -107,24 +110,30 @@ const ChatBlock: React.FC<Props> = ({block, loading, isLastBlock}) => {
                               value={editedBlockContent}
                           ></textarea>
                       )
-                      : (
+                      : (isUser ? (
+                          <div ref={contentRef} className="self-end">
+                            <div
+                                className="inline-block max-w-[85%] md:max-w-[70%] rounded-3xl px-4 py-2 shadow-sm text-left bg-emerald-500 text-white">
+                              <UserContentBlock text={block.content}
+                                                fileDataRef={(block.fileDataRef) ? block.fileDataRef : []}/>
+                            </div>
+                          </div>
+                      ) : (
                           <div ref={contentRef}
                                className="markdown prose w-full break-words dark:prose-invert light">
-                            {block.role === 'user' ? (
-                                <UserContentBlock text={block.content} fileDataRef={(block.fileDataRef) ? block.fileDataRef : []}/>
-                            ) : (
-                                <MarkdownBlock markdown={block.content} role={block.role}
+                            <MarkdownBlock markdown={block.content} role={block.role}
                                                loading={loading}/>
-                            )}
-                          </div>)}
+                          </div>
+                      ))}
 
                 </div>
               </div>
             </div>
           </div>
           {!(isLastBlock && loading) && (
-              <div id={`action-block-${block.id}`} className="flex justify-start items-center ml-10">
-                {block.role === 'assistant' && (
+              <div id={`action-block-${block.id}`}
+                   className={`flex items-center ${isUser ? 'justify-end mr-10' : 'justify-start ml-10'}`}>
+                {isAssistant && (
                     <TextToSpeechButton content={block.content}/>
                 )}
                 <div className="copy-button">
