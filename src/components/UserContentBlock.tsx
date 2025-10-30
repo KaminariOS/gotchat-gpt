@@ -1,8 +1,9 @@
 import React, { type JSX } from 'react';
 import {SNIPPET_MARKERS} from "../constants/appConstants";
 import FoldableTextSection from './FoldableTextSection';
-import { FileData, FileDataRef } from '../models/FileData';
+import { FileDataRef } from '../models/FileData';
 import FileDataPreview from './FileDataPreview';
+import MarkdownBlock from './MarkdownBlock';
 
 interface UserContentBlockProps {
   text: string;
@@ -10,16 +11,26 @@ interface UserContentBlockProps {
 }
 
 const UserContentBlock: React.FC<UserContentBlockProps> = ({text, fileDataRef}) => {
-  const preformattedTextStyles: React.CSSProperties = {
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
+  const renderMarkdownSection = (content: string, key: string): JSX.Element => {
+    if (!content) {
+      return <React.Fragment key={key}></React.Fragment>;
+    }
+
+    return (
+      <div
+        key={key}
+        className="markdown prose w-full break-words dark:prose-invert light"
+      >
+        <MarkdownBlock markdown={content} role="user" loading={false}/>
+      </div>
+    );
   };
 
   const processText = (inputText: string): JSX.Element[] => {
     const sections: JSX.Element[] = [];
     inputText.split(SNIPPET_MARKERS.begin).forEach((section, index) => {
       if (index === 0 && !section.includes(SNIPPET_MARKERS.end)) {
-        sections.push(<div key={`text-${index}`} style={preformattedTextStyles}>{section}</div>);
+        sections.push(renderMarkdownSection(section, `text-${index}`));
         return;
       }
 
@@ -32,11 +43,10 @@ const UserContentBlock: React.FC<UserContentBlockProps> = ({text, fileDataRef}) 
 
         const remainingText = section.substring(endSnippetIndex + SNIPPET_MARKERS.end.length);
         if (remainingText) {
-          sections.push(<div key={`text-after-${index}`}
-                             style={preformattedTextStyles}>{remainingText}</div>);
+          sections.push(renderMarkdownSection(remainingText, `text-after-${index}`));
         }
       } else {
-        sections.push(<div key={`text-start-${index}`} style={preformattedTextStyles}>{section}</div>);
+        sections.push(renderMarkdownSection(section, `text-start-${index}`));
       }
     });
 
