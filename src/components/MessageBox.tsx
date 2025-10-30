@@ -61,6 +61,8 @@ const MessageBox =
       const previewLabel = t('preview', {defaultValue: 'Preview'});
       const expandLabel = t('expand', {defaultValue: 'Expand'});
       const collapseLabel = t('collapse', {defaultValue: 'Collapse'});
+      const isMacPlatform = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+      const shortcutLabel = isMacPlatform ? '⌘⇧E' : 'Ctrl+Shift+E';
 
       const focusComposer = useCallback(() => {
         setTimeout(() => {
@@ -458,6 +460,30 @@ const MessageBox =
         }
       }, [focusComposer, isExpanded]);
 
+      useEffect(() => {
+        if (typeof window === 'undefined') {
+          return;
+        }
+
+        const handleGlobalShortcut = (event: globalThis.KeyboardEvent) => {
+          const key = event.key?.toLowerCase();
+          const modifierPressed = isMacPlatform ? event.metaKey : event.ctrlKey;
+          if (modifierPressed && event.shiftKey && key === 'e') {
+            event.preventDefault();
+            if (isExpanded) {
+              handleCollapseEditor();
+            } else {
+              handleExpandEditor();
+            }
+          }
+        };
+
+        window.addEventListener('keydown', handleGlobalShortcut);
+        return () => {
+          window.removeEventListener('keydown', handleGlobalShortcut);
+        };
+      }, [handleCollapseEditor, handleExpandEditor, isExpanded, isMacPlatform]);
+
       const renderAttachmentButton = () => (
         <button
           type="button"
@@ -546,14 +572,16 @@ const MessageBox =
               <div className="flex items-center justify-between border-b border-black/10 dark:border-gray-800 px-4 py-3">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('send-a-message')}</span>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCollapseEditor}
-                    className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-3 py-1 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <ArrowsPointingInIcon className="h-4 w-4"/>
-                    {collapseLabel}
-                  </button>
+                  <Tooltip title={`${collapseLabel} (${shortcutLabel})`} side="top" sideOffset={6}>
+                    <button
+                      type="button"
+                      onClick={handleCollapseEditor}
+                      className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-3 py-1 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <ArrowsPointingInIcon className="h-4 w-4"/>
+                      {collapseLabel}
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
               {renderFilePreview('border-b border-black/10 dark:border-gray-800')}
@@ -613,14 +641,16 @@ const MessageBox =
                   {renderAttachmentButton()}
                 </div>
                 <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={handleExpandEditor}
-                    className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-2 py-1 text-xs text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <ArrowsPointingOutIcon className="h-4 w-4"/>
-                    {expandLabel}
-                  </button>
+                  <Tooltip title={`${expandLabel} (${shortcutLabel})`} side="top" sideOffset={4}>
+                    <button
+                      type="button"
+                      onClick={handleExpandEditor}
+                      className="flex items-center gap-1 rounded-md border border-black/10 dark:border-gray-700 px-2 py-1 text-xs text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <ArrowsPointingOutIcon className="h-4 w-4"/>
+                      {expandLabel}
+                    </button>
+                  </Tooltip>
                 </div>
 
                 {/* Grammarly extension container */}
