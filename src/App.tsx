@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {BrowserRouter, Navigate, Route, Routes} from 'react-router-dom';
 import {I18nextProvider} from 'react-i18next';
 import i18n from './i18n';
@@ -15,6 +15,36 @@ const App = () => {
   const toggleSidebarCollapse = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+
+    if (mediaQuery.matches) {
+      setIsSidebarCollapsed(true);
+    }
+
+    const handleMediaQueryChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleMediaQueryChange);
+      return () => {
+        mediaQuery.removeEventListener('change', handleMediaQueryChange);
+      };
+    } else if (typeof mediaQuery.addListener === 'function') {
+      mediaQuery.addListener(handleMediaQueryChange);
+      return () => {
+        mediaQuery.removeListener(handleMediaQueryChange);
+      };
+    }
+  }, []);
 
   interface MainPageProps {
     className: string;
